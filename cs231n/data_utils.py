@@ -1,6 +1,8 @@
 import cPickle as pickle
 import numpy as np
 import os
+import gc
+
 from scipy.misc import imread
 
 def load_CIFAR_batch(filename):
@@ -9,22 +11,40 @@ def load_CIFAR_batch(filename):
     datadict = pickle.load(f)
     X = datadict['data']
     Y = datadict['labels']
-    X = X.reshape(10000, 3, 32, 32).transpose(0,2,3,1).astype("float")
+    X = X.reshape(10000, 3, 32, 32)
+    X = X.transpose(0,2,3,1)
+    
+    print X.shape
+    # d1 = X[:, :32/2,:,:].astype('float')
+    # d2 = X[:, 32/2:,:,:].astype('float')
+    # del X
+    # X = np.hstack((d1, d2))
+
+    # print "end:", X.shape
+    X = X.astype("uint8", copy=False)
     Y = np.array(Y)
     return X, Y
 
 def load_CIFAR10(ROOT):
   """ load all of cifar """
-  xs = []
-  ys = []
+  Xtr,Ytr,Xte,Yte = [],[],[],[]
+  xs,ys = [], []
+
   for b in range(1,6):
     f = os.path.join(ROOT, 'data_batch_%d' % (b, ))
     X, Y = load_CIFAR_batch(f)
     xs.append(X)
     ys.append(Y)    
+    del X, Y
+
+  #xs = xs[:3]
+  #ys = ys[:3]
+  gc.collect()
+  
   Xtr = np.concatenate(xs)
+  del xs
   Ytr = np.concatenate(ys)
-  del X, Y
+  del ys
   Xte, Yte = load_CIFAR_batch(os.path.join(ROOT, 'test_batch'))
   return Xtr, Ytr, Xte, Yte
 
