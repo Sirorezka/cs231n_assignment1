@@ -1,6 +1,8 @@
 import numpy as np
 from random import shuffle
 
+
+
 def svm_loss_naive(W, X, y, reg):
   """
   Structured SVM loss function, naive implementation (with loops).
@@ -21,6 +23,7 @@ def svm_loss_naive(W, X, y, reg):
   """
 
   dW = np.zeros(W.shape) # initialize the gradient as zero
+  W_h = np.zeros(W.shape)
 
   step_size_log = -10
   step_size = 10 ** step_size_log
@@ -29,23 +32,50 @@ def svm_loss_naive(W, X, y, reg):
   # compute the loss and the gradient
   num_classes = W.shape[1]
   num_train = X.shape[0]
-  loss = 0.0
-  loss_grad = 0.0
-  for i in xrange(num_train):
-    scores = X[i].dot(W)
-    scores_grad = X[i].dot(W+step_size)
 
+  loss = 0.0
+  loss_grad    =   np.zeros(W.shape)
+  scores_grad  =   np.zeros([W.shape[0],W.shape[1]],dtype=object)
+  correct_class_score  =   np.zeros(W.shape)
+  correct_class_grad   =   np.zeros([W.shape[0],W.shape[1]])
+  margin_grad  =   np.zeros(W.shape)
+
+  for i in xrange(num_train):
+    
+
+
+    scores = X[i].dot(W)
     correct_class_score = scores[y[i]]
-    correct_class_grad = scores_grad[y[i]]
 
     for j in xrange(num_classes):
       if j == y[i]:
         continue
       margin = scores[j] - correct_class_score + 1 # note delta = 1
-      margin_grad = scores_grad[j] - correct_class_score + 1 # note delta = 1
       if margin > 0:
         loss += margin
-        loss_grad += margin_grad
+
+
+
+    for k in xrange(W.shape[0]):
+      for l in xrange(W.shape[1]):
+          W_h = W
+          W_h [k,l] += step_size
+          scores_grad [k,l] = np.array(X[i].dot(W_h))
+          correct_class_grad [k,l] = scores_grad[k,l][y[i]]
+
+
+          for j in xrange(num_classes):
+            if j == y[i]:
+              continue
+
+
+          margin_grad [k][l] = scores_grad [k,l][j] - correct_class_grad [k,l] + 1 # note delta = 1
+          if margin > 0:
+          loss_grad[k,l] += margin_grad[k][l]
+
+
+    if i % 100 == 0:
+      print (i)
 
   # Right now the loss is a sum over all training examples, but we want it
   # to be an average instead so we divide by num_train.
@@ -57,6 +87,8 @@ def svm_loss_naive(W, X, y, reg):
   loss_grad += 0.5 * reg * np.sum((W+step_size) * (W+step_size))
 
   dW = (loss_grad - loss) / step_size
+
+
   #############################################################################
   # TODO:                                                                     #
   # Compute the gradient of the loss function and store it dW.                #
