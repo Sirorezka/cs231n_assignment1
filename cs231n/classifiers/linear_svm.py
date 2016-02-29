@@ -3,7 +3,7 @@ from random import shuffle
 
 
 
-def svm_loss_naive(W, X, y, reg):
+def svm_loss_naive(W, X, y, reg, dograd = False):
   """
   Structured SVM loss function, naive implementation (with loops).
 
@@ -16,6 +16,7 @@ def svm_loss_naive(W, X, y, reg):
   - y: A numpy array of shape (N,) containing training labels; y[i] = c means
     that X[i] has label c, where 0 <= c < C.
   - reg: (float) regularization strength
+  - dograd: perform gradient descend
 
   Returns a tuple of:
   - loss as single float
@@ -23,26 +24,26 @@ def svm_loss_naive(W, X, y, reg):
   """
 
   dW = np.zeros(W.shape) # initialize the gradient as zero
-  W_h = np.zeros(W.shape)
+  reg_mat_h = np.zeros(W.shape)
+  reg_mat_mh = np.zeros(W.shape)
 
-  step_size_log = -10
-  step_size = 10 ** step_size_log
+  step_size = 1e-5
 
 
   # compute the loss and the gradient
   num_classes = W.shape[1]
-  num_train = X.shape[0]
+  num_train   = X.shape[0]
 
   loss = 0.0
-  loss_grad    =   np.zeros(W.shape)
+  loss_grad_h    =   np.zeros(W.shape)   # plus  step_size
+  loss_grad_mh   =   np.zeros(W.shape)   # minus step_size
+
   scores_grad  =   np.zeros([W.shape[0],W.shape[1]],dtype=object)
   correct_class_score  =   np.zeros(W.shape)
   correct_class_grad   =   np.zeros([W.shape[0],W.shape[1]])
-  margin_grad  =   np.zeros(W.shape)
+
 
   for i in xrange(num_train):
-    
-
 
     scores = X[i].dot(W)
     correct_class_score = scores[y[i]]
@@ -55,38 +56,63 @@ def svm_loss_naive(W, X, y, reg):
         loss += margin
 
 
+    if dograd == True:
+      for k in xrange(W.shape[0]):
+        for l in xrange(W.shape[1]):
 
-    for k in xrange(W.shape[0]):
-      for l in xrange(W.shape[1]):
-          W_h = W
-          W_h [k,l] += step_size
-          scores_grad [k,l] = np.array(X[i].dot(W_h))
-          correct_class_grad [k,l] = scores_grad[k,l][y[i]]
+            W_h  = np.copy(W)      # plus step_size
+            W_mh = np.copy(W)      # minus step_size
+
+            W_h  [k,l] += step_size
+            W_mh [k,l] -= step_size
+
+            reg_mat_h [k,l] = np.sum(W_h * W_h)     # matrix for regulazation
+            reg_mat_mh [k,l] = np.sum(W_mh * W_mh)  # matrix for regulazation
+
+            scores_grad_h  = X[i].dot(W_h)
+            scores_grad_mh = X[i].dot(W_mh)
+
+            ###
+
+            correct_class_grad_h  = scores_grad_h [y[i]]
+            correct_class_grad_mh = scores_grad_mh[y[i]]
+
+            ###
+
+            for j in xrange(num_classes):
+              if j == y[i]:
+                continue
+
+              margin_grad_h  = scores_grad_h  [j] - correct_class_grad_h  + 1 # note delta = 1
+              margin_grad_mh = scores_grad_mh [j] - correct_class_grad_mh + 1 # note delta = 1
+
+              ###
+
+              if margin_grad_h > 0:
+                loss_grad_h  [k,l]  += margin_grad_h
+
+              if margin_grad_mh > 0:
+                loss_grad_mh [k,l] += margin_grad_mh
 
 
-          for j in xrange(num_classes):
-            if j == y[i]:
-              continue
-
-
-          margin_grad [k][l] = scores_grad [k,l][j] - correct_class_grad [k,l] + 1 # note delta = 1
-          if margin > 0:
-          loss_grad[k,l] += margin_grad[k][l]
-
-
-    if i % 100 == 0:
-      print (i)
+      if i % 100 == 0:
+          print (i)
 
   # Right now the loss is a sum over all training examples, but we want it
   # to be an average instead so we divide by num_train.
   loss /= num_train
-  loss_grad /= num_train
+
+  loss_grad_h /= num_train
+  loss_grad_mh /= num_train
 
   # Add regularization to the loss.
   loss += 0.5 * reg * np.sum(W * W)
-  loss_grad += 0.5 * reg * np.sum((W+step_size) * (W+step_size))
 
-  dW = (loss_grad - loss) / step_size
+
+  loss_grad_h  += 0.5 * reg * reg_mat_h
+  loss_grad_mh += 0.5 * reg * reg_mat_mh
+
+  dW = (loss_grad_h - loss_grad_mh) / (2 * step_size)
 
 
   #############################################################################
@@ -97,7 +123,6 @@ def svm_loss_naive(W, X, y, reg):
   # loss is being computed. As a result you may need to modify some of the    #
   # code above to compute the gradient.                                       #
   #############################################################################
-
 
   return loss, dW
 
