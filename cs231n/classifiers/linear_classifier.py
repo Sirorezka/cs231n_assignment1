@@ -35,8 +35,8 @@ class LinearClassifier(object):
     # Run stochastic gradient descent to optimize W
     loss_history = []
     for it in xrange(num_iters):
-      X_batch = None
-      y_batch = None
+
+
 
       #########################################################################
       # TODO:                                                                 #
@@ -49,7 +49,11 @@ class LinearClassifier(object):
       # Hint: Use np.random.choice to generate indices. Sampling with         #
       # replacement is faster than sampling without replacement.              #
       #########################################################################
-      pass
+
+      ind_batch =  np.random.choice(range(num_train), size=batch_size, replace=True)   # batch indexes
+      X_batch = X[ind_batch,:]
+      y_batch = y[ind_batch]
+
       #########################################################################
       #                       END OF YOUR CODE                                #
       #########################################################################
@@ -58,12 +62,15 @@ class LinearClassifier(object):
       loss, grad = self.loss(X_batch, y_batch, reg)
       loss_history.append(loss)
 
+
       # perform parameter update
       #########################################################################
       # TODO:                                                                 #
       # Update the weights using the gradient and the learning rate.          #
       #########################################################################
-      pass
+
+      self.W  += - learning_rate * grad 
+
       #########################################################################
       #                       END OF YOUR CODE                                #
       #########################################################################
@@ -74,29 +81,32 @@ class LinearClassifier(object):
     return loss_history
 
   def predict(self, X):
-    """
-    Use the trained weights of this linear classifier to predict labels for
-    data points.
-
-    Inputs:
-    - X: D x N array of training data. Each column is a D-dimensional point.
-
-    Returns:
-    - y_pred: Predicted labels for the data in X. y_pred is a 1-dimensional
-      array of length N, and each element is an integer giving the predicted
-      class.
-    """
-    y_pred = np.zeros(X.shape[1])
-    ###########################################################################
-    # TODO:                                                                   #
-    # Implement this method. Store the predicted labels in y_pred.            #
-    ###########################################################################
     pass
-    ###########################################################################
-    #                           END OF YOUR CODE                              #
-    ###########################################################################
-    return y_pred
+    # """
+    # Use the trained weights of this linear classifier to predict labels for
+    # data points.
+
+    # Inputs:
+    # - X: D x N array of training data. Each column is a D-dimensional point.
+
+    # Returns:
+    # - y_pred: Predicted labels for the data in X. y_pred is a 1-dimensional
+    #   array of length N, and each element is an integer giving the predicted
+    #   class.
+    # """
+    # print "dfs"
+    # y_pred = np.zeros(X.shape[1])
+    # ###########################################################################
+    # # TODO:                                                                   #
+    # # Implement this method. Store the predicted labels in y_pred.            #
+    # ###########################################################################
+    # pass
+    # ###########################################################################
+    # #                           END OF YOUR CODE                              #
+    # ###########################################################################
+    # return y_pred
   
+
   def loss(self, X_batch, y_batch, reg):
     """
     Compute the loss function and its derivative. 
@@ -118,8 +128,18 @@ class LinearClassifier(object):
 class LinearSVM(LinearClassifier):
   """ A subclass that uses the Multiclass SVM loss function """
 
+  def predict(self, X):
+
+    y_pred = np.zeros(X.shape[1])
+    classes = np.dot(X,self.W)
+    y_pred = np.argmax(classes,axis=1)
+    return y_pred
+
   def loss(self, X_batch, y_batch, reg):
     return svm_loss_vectorized(self.W, X_batch, y_batch, reg)
+
+
+
 
 
 class Softmax(LinearClassifier):

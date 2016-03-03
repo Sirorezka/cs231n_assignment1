@@ -55,6 +55,7 @@ def svm_loss_naive(W, X, y, reg, dograd = False, verbose = False):
     if verbose: print "corr score:", correct_class_score
 
 
+    d_grad_count = 0
     for j in xrange(num_classes):
       if j == y[i]:
         continue
@@ -65,49 +66,60 @@ def svm_loss_naive(W, X, y, reg, dograd = False, verbose = False):
 
       if margin > 0:
         loss += margin
+        d_grad_count += 1
+
+        # print dW.shape
+        # print X[i].shape
+        dW[:,j] += X[i]
 
 
-    if dograd == True:
-      for k in xrange(W.shape[0]):
-        for l in xrange(W.shape[1]):
+    dW[:,y[i]] -= d_grad_count * X[i]
 
-            W_h  = np.copy(W)      # plus step_size
-            W_mh = np.copy(W)      # minus step_size
+    ##
+    ## Numerical estimation of the gradient
+    ##
 
-            W_h  [k,l] += step_size
-            W_mh [k,l] -= step_size
+    # if dograd == True:
+    #   for k in xrange(W.shape[0]):
+    #     for l in xrange(W.shape[1]):
 
-            reg_mat_h [k,l] = np.sum(W_h * W_h)     # matrix for regulazation
-            reg_mat_mh [k,l] = np.sum(W_mh * W_mh)  # matrix for regulazation
+    #         W_h  = np.copy(W)      # plus step_size
+    #         W_mh = np.copy(W)      # minus step_size
 
-            scores_grad_h  = X[i].dot(W_h)
-            scores_grad_mh = X[i].dot(W_mh)
+    #         W_h  [k,l] += step_size
+    #         W_mh [k,l] -= step_size
 
-            ###
+    #         reg_mat_h [k,l] = np.sum(W_h * W_h)     # matrix for regulazation
+    #         reg_mat_mh [k,l] = np.sum(W_mh * W_mh)  # matrix for regulazation
 
-            correct_class_grad_h  = scores_grad_h [y[i]]
-            correct_class_grad_mh = scores_grad_mh[y[i]]
+    #         scores_grad_h  = X[i].dot(W_h)
+    #         scores_grad_mh = X[i].dot(W_mh)
 
-            ###
+    #         ###
 
-            for j in xrange(num_classes):
-              if j == y[i]:
-                continue
+    #         correct_class_grad_h  = scores_grad_h [y[i]]
+    #         correct_class_grad_mh = scores_grad_mh[y[i]]
 
-              margin_grad_h  = scores_grad_h  [j] - correct_class_grad_h  + 1 # note delta = 1
-              margin_grad_mh = scores_grad_mh [j] - correct_class_grad_mh + 1 # note delta = 1
+    #         ###
 
-              ###
+    #         for j in xrange(num_classes):
+    #           if j == y[i]:
+    #             continue
 
-              if margin_grad_h > 0:
-                loss_grad_h  [k,l]  += margin_grad_h
+    #           margin_grad_h  = scores_grad_h  [j] - correct_class_grad_h  + 1 # note delta = 1
+    #           margin_grad_mh = scores_grad_mh [j] - correct_class_grad_mh + 1 # note delta = 1
 
-              if margin_grad_mh > 0:
-                loss_grad_mh [k,l] += margin_grad_mh
+    #           ###
+
+    #           if margin_grad_h > 0:
+    #             loss_grad_h  [k,l]  += margin_grad_h
+
+    #           if margin_grad_mh > 0:
+    #             loss_grad_mh [k,l] += margin_grad_mh
 
 
-      if i % 100 == 0:
-          print (i)
+    #  if i % 100 == 0:
+    #      print (i)
 
   # Right now the loss is a sum over all training examples, but we want it
   # to be an average instead so we divide by num_train.
@@ -116,14 +128,17 @@ def svm_loss_naive(W, X, y, reg, dograd = False, verbose = False):
   loss_grad_h /= num_train
   loss_grad_mh /= num_train
 
+  dW /= num_train
+
+  dW += 0.5 * reg * 2 * W
   # Add regularization to the loss.
   loss += 0.5 * reg * np.sum(W * W)
 
 
-  loss_grad_h  += 0.5 * reg * reg_mat_h
-  loss_grad_mh += 0.5 * reg * reg_mat_mh
+  #loss_grad_h  += 0.5 * reg * reg_mat_h
+  #loss_grad_mh += 0.5 * reg * reg_mat_mh
 
-  dW = (loss_grad_h - loss_grad_mh) / (2 * step_size)
+  #dW = (loss_grad_h - loss_grad_mh) / (2 * step_size)
 
 
   #############################################################################
@@ -149,7 +164,6 @@ def svm_loss_vectorized(W, X, y, reg):
   loss_sum = 0.0
   loss = 0
   dW = np.zeros(W.shape) # initialize the gradient as zero
-  print "reg", reg 
 
 
   #############################################################################
@@ -173,10 +187,7 @@ def svm_loss_vectorized(W, X, y, reg):
   correct_class_score [c,y[c]] = 0
 
   loss = scores - correct_class_score + unit_mat * delta
-  loss[loss<0] = 0
-  loss[c,y[c]] = 0
 
-  loss_sum = (np.sum(loss)/X.shape[0]) + 0.5 * reg * np.sum(W * W)
 
 
   #############################################################################
@@ -194,8 +205,175 @@ def svm_loss_vectorized(W, X, y, reg):
   # loss.                                                                     #
   #############################################################################
 
+
+
+
+  ###
+  ###    grad for y_i <> j
+  ###
+
+  ## Counting non null elements in loss function
+  loss_uni = np.ones(loss.shape)
+  loss_uni[loss<0] = 0
+
+  dW = np.dot(np.transpose(X),loss_uni)
+
+
+  ###
+  ###    grad for y_i == j
+  ###
+
+  gr_minus = np.sum(loss>0, axis=1)
+
+  zero_mat =  np.zeros([X.shape[0],W.shape[1]])
+  zero_mat[c,y]=1
+
+
+  gr_minus =  np.dot(np.identity(gr_minus.shape[0]) * gr_minus, zero_mat)
+
+  dW -= np.dot(np.transpose(X), gr_minus)
+  dW /= X.shape[0]
+  dW += 0.5 * reg * 2 * W
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
 
+
+  loss[loss<0] = 0
+  loss[c,y[c]] = 0
+
+  loss_sum = (np.sum(loss)/X.shape[0]) + 0.5 * reg * np.sum(W * W)
+
   return loss_sum, dW
+
+
+
+
+def old_vect_grad_desc():
+
+      ## Old version of gradient descent
+
+    from cs231n.classifiers.linear_svm import svm_loss_naive
+    from cs231n.classifiers.linear_svm import svm_loss_vectorized
+
+    loss, grad = svm_loss_naive(W, X_dev, y_dev, 0.5, dograd = False)
+    loss2, grad = svm_loss_vectorized(W, X_dev, y_dev, 0.5)
+
+    print "loss: ", loss
+    print "loss2: ", loss2
+
+
+    # data
+    #reg = 10000
+    X = X_dev
+    y = y_dev
+    delta = 1
+    loss_sum = 0.0
+    loss = 0
+    reg = 0.5
+    step_size = 1e-5
+    dW = np.zeros(W.shape) # initialize the gradient as zero
+    dW2 = np.zeros(W.shape) # initialize the gradient as zero
+
+
+    scores = X.dot(W)
+
+    # calculating  'correct_class_scores':
+    unit_mat =  np.ones([X.shape[0],W.shape[1]])
+
+    c = range(0,X.shape[0])
+    correct_class_score = np.identity(X.shape[0])
+    correct_class_score[c,c] = scores[c,y[c]]
+
+
+    correct_class_score = np.dot(correct_class_score,unit_mat)
+    correct_class_score [c,y[c]] = 0
+
+    loss = scores - correct_class_score + unit_mat * delta
+
+    print loss.shape
+    loss_uni = np.ones(loss.shape)
+    loss_uni[loss<0] = 0
+    print np.sum(loss_uni, axis=1)
+    print loss_uni
+
+    ## grad for y_i <> j
+    dW2 = np.dot(np.transpose(X),loss_uni)
+    print "dw2:",dW2.shape
+
+    gr_minus = np.sum(loss>0, axis=1)
+    print "gr_minus", gr_minus
+
+
+    zero_mat =  np.zeros([X.shape[0],W.shape[1]])
+    zero_mat[c,y]=1
+
+
+    gr_minus =  np.dot(np.identity(gr_minus.shape[0]) * gr_minus, zero_mat)
+    print gr_minus.shape
+    print gr_minus[0:20,0:20]
+
+    print "x shape: ", X.shape
+
+
+    dW2 -= np.dot(np.transpose(X), gr_minus)
+    dW2 /= X.shape[0]
+    dW2 += 0.5 * reg * 2 * W
+
+    print "loss matr dimensions: ", loss.shape
+    print X.shape
+    k = 1
+
+
+    for k in xrange(X.shape[1]):
+        for l in xrange (W.shape[1]):
+            
+            X_h = np.zeros ([X.shape[0],W.shape[1]])
+            X_h[:,l] = X[:,k] * step_size
+            
+            
+            c = range(0,X.shape[0])
+            unit_mat =  np.ones([X.shape[0],W.shape[1]])
+            correct_class_score = np.identity(X.shape[0])
+            correct_class_score[c,c] = X_h[c,y[c]]
+            correct_class_score = np.dot(correct_class_score,unit_mat)
+            correct_class_score [c,y[c]] = 0
+            
+
+            loss_h = loss + X_h - correct_class_score
+            loss_h[loss_h<0] = 0
+            loss_h[c,y[c]] = 0
+            
+
+
+            loss_ph_sum = (np.sum(loss_h)/X.shape[0]) 
+            
+            
+            loss_h = loss - X_h + correct_class_score
+            loss_h[loss_h<0] = 0
+            loss_h[c,y[c]] = 0
+            loss_mh_sum = (np.sum(loss_h)/X.shape[0])
+            
+
+            dW[k,l] = loss_ph_sum - loss_mh_sum 
+            
+            
+    dW = (dW + reg * 2 * W * step_size + step_size ** 2) / (2 * step_size)
+
+    print dW.shape
+    print dW[0,0:10]
+
+    print "dW2"
+    print dW2.shape
+    print dW2[0,0:10]
+        
+    loss[loss<0] = 0
+    loss[c,y[c]] = 0    
+        
+    difference = np.linalg.norm(dW - dW2, ord='fro')
+    print ("diff ",difference)
+
+    loss_sum = (np.sum(loss)/X.shape[0])  + 0.5 * reg * np.sum(W * W)
+
+    print loss_sum
